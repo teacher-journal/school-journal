@@ -11,7 +11,7 @@ def load_data():
         default_data = {
             "classes": [
                 {"id": 1, "name": "5 А"},
-                {"id": 2, "name": "5 Б"}
+                {"id": 2, "name": "6 Б"}
             ],
             "students": [],
             "grades": {}
@@ -96,17 +96,14 @@ def add_students_bulk():
     save_data(data)
     return jsonify({"success": True, "count": added_count})
 
-# УДАЛЕНИЕ УЧЕНИКА
 @app.route('/api/delete_student', methods=['POST'])
 def delete_student():
     data = load_data()
     req_data = request.json
     student_id = req_data.get('student_id')
     
-    # Удаляем ученика из списка
     data['students'] = [s for s in data['students'] if s['id'] != student_id]
     
-    # Удаляем его оценки
     str_id = str(student_id)
     if str_id in data['grades']:
         del data['grades'][str_id]

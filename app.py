@@ -1,320 +1,148 @@
-import os
-import sqlite3
-from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
+import json
+import os
 
 app = Flask(__name__)
 
-# Актуальные даты четвертей Беларуси на 2026/2027 учебный год
-QUARTERS = {
-    1: ('2026-09-01', '2026-10-31'),
-    2: ('2026-11-09', '2026-12-24'),
-    3: ('2027-01-11', '2027-03-27'),
-    4: ('2027-04-05', '2027-05-29')
-}
+DATA_FILE = 'journal_data.json'
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'journal.db')
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        default_data = {
+            "classes": [
+                {"id": 1, "name": "5 А"},
+                {"id": 2, "name": "5 Б"}
+            ],
+            "students": [],
+            "grades": {}
+        }
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_data, f, ensure_ascii=False, indent=2)
+        return default_data
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-
-def init_db():
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS classes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS class_subjects (
-        class_id INTEGER, subject_id INTEGER,
-        PRIMARY KEY (class_id, subject_id),
-        FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
-        FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT, class_id INTEGER, subgroup INTEGER DEFAULT 0,
-        FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE
-    )''')
-    
-    cursor.execute("PRAGMA table_info(students)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'subgroup' not in columns:
-        cursor.execute("ALTER TABLE students ADD COLUMN subgroup INTEGER DEFAULT 0")
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS lessons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, class_id INTEGER, subject_id INTEGER,
-        date_str TEXT, full_date TEXT, quarter INTEGER, topic TEXT, homework TEXT, work_type TEXT,
-        FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
-        FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS grades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER, lesson_id INTEGER, val TEXT,
-        FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE,
-        FOREIGN KEY(lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
-    )''')
-    
-    cursor.execute("SELECT COUNT(*) FROM classes")
-    if cursor.fetchone()[0] == 0:
-        classes = ['5 "А"', '5 "Б"', '6 "А"', '6 "Б"', '6 "В"', '7 "А"', '7 "Б"', '8 "А"', '8 "Б"', '9 "А"', '9 "Б"']
-        for c in classes:
-            cursor.execute("INSERT INTO classes (name) VALUES (?)", (c,))
-            
-        subjects = ['Информатика', 'Математика', 'Физика', 'Английский язык']
-        for s in subjects:
-            cursor.execute("INSERT INTO subjects (name) VALUES (?)", (s,))
-            
-        cursor.execute("SELECT id FROM classes")
-        c_ids = [r[0] for r in cursor.fetchall()]
-        cursor.execute("SELECT id FROM subjects")
-        s_ids = [r[0] for r in cursor.fetchall()]
-        for cid in c_ids:
-            for sid in s_ids:
-                cursor.execute("INSERT INTO class_subjects (class_id, subject_id) VALUES (?, ?)", (cid, sid))
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def determine_quarter(dt_str):
-    for q_num, (start_str, end_str) in QUARTERS.items():
-        if start_str <= dt_str <= end_str:
-            return q_num
-    return 1
+def save_data(data):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# === API: КЛАССЫ ===
-@app.route('/api/classes', methods=['GET', 'POST'])
-def handle_classes():
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == 'POST':
-        name = request.json.get('name')
-        if name:
-            cursor.execute("INSERT OR IGNORE INTO classes (name) VALUES (?)", (name,))
-            conn.commit()
-        conn.close()
-        return jsonify({'status': 'ok'})
-    else:
-        cursor.execute('''SELECT c.id, c.name, COUNT(DISTINCT s.id) 
-                          FROM classes c 
-                          LEFT JOIN students s ON c.id = s.class_id 
-                          GROUP BY c.id ORDER BY c.name''')
-        rows = cursor.fetchall()
-        conn.close()
-        return jsonify([{'id': r[0], 'name': r[1], 'students_count': r[2]} for r in rows])
+@app.route('/api/get_data', methods=['GET'])
+def get_data():
+    return jsonify(load_data())
 
-@app.route('/api/classes/<int:class_id>', methods=['DELETE'])
-def delete_class(class_id):
-    conn = get_db()
-    conn.execute("DELETE FROM classes WHERE id = ?", (class_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
-
-# === API: ПРЕДМЕТЫ КЛАССА ===
-@app.route('/api/classes/<int:class_id>/subjects', methods=['GET', 'POST'])
-def handle_class_subjects(class_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == 'POST':
-        subj_name = request.json.get('name')
-        if subj_name:
-            cursor.execute("INSERT OR IGNORE INTO subjects (name) VALUES (?)", (subj_name,))
-            cursor.execute("SELECT id FROM subjects WHERE name = ?", (subj_name,))
-            sid = cursor.fetchone()[0]
-            cursor.execute("INSERT OR IGNORE INTO class_subjects (class_id, subject_id) VALUES (?, ?)", (class_id, sid))
-            conn.commit()
-        conn.close()
-        return jsonify({'status': 'ok'})
-    else:
-        cursor.execute('''SELECT s.id, s.name FROM subjects s 
-                          JOIN class_subjects cs ON s.id = cs.subject_id 
-                          WHERE cs.class_id = ? ORDER BY s.name''', (class_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        return jsonify([{'id': r[0], 'name': r[1]} for r in rows])
-
-@app.route('/api/classes/<int:class_id>/subjects/<int:subject_id>', methods=['DELETE'])
-def delete_class_subject(class_id, subject_id):
-    conn = get_db()
-    conn.execute("DELETE FROM class_subjects WHERE class_id = ? AND subject_id = ?", (class_id, subject_id))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
-
-# === API: УЧАЩИЕСЯ И ПОДГРУППЫ ===
-@app.route('/api/classes/<int:class_id>/students', methods=['GET', 'POST'])
-def handle_students(class_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == 'POST':
-        full_name = request.json.get('full_name')
-        subgroup = request.json.get('subgroup', 0)
-        if full_name:
-            cursor.execute("INSERT INTO students (full_name, class_id, subgroup) VALUES (?, ?, ?)", (full_name, class_id, subgroup))
-            conn.commit()
-        conn.close()
-        return jsonify({'status': 'ok'})
-    else:
-        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        return jsonify([{'id': r[0], 'full_name': r[1], 'subgroup': r[2]} for r in rows])
-
-@app.route('/api/students/<int:student_id>', methods=['DELETE', 'PUT'])
-def handle_student_item(student_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == 'DELETE':
-        cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
-    elif request.method == 'PUT':
-        subgroup = request.json.get('subgroup', 0)
-        cursor.execute("UPDATE students SET subgroup = ? WHERE id = ?", (subgroup, student_id))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
-
-# === API: УРОКИ ===
-@app.route('/api/lessons', methods=['POST'])
-def add_lesson():
-    data = request.json
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/add_class', methods=['POST'])
+def add_class():
+    data = load_data()
+    req_data = request.json
+    class_name = req_data.get('name', '').strip()
     
-    date_str = data['date_str']
-    try:
-        parts = date_str.split('.')
-        day = int(parts[0])
-        month = int(parts[1])
-        year = 2026 if month >= 9 else 2027
-        dt = datetime(year, month, day)
-        full_date = dt.strftime("%Y-%m-%d")
-    except:
-        full_date = "2026-09-01"
+    if not class_name:
+        return jsonify({"error": "Пустое имя класса"}), 400
         
-    quarter = determine_quarter(full_date)
-    
-    cursor.execute("INSERT INTO lessons (class_id, subject_id, date_str, full_date, quarter, topic, homework, work_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                   (data['class_id'], data['subject_id'], date_str, full_date, quarter, data.get('topic', ''), data.get('homework', ''), data.get('work_type', 'Урок')))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
+    new_id = max([c['id'] for c in data['classes']], default=0) + 1
+    new_class = {"id": new_id, "name": class_name}
+    data['classes'].append(new_class)
+    save_data(data)
+    return jsonify({"success": True, "class": new_class})
 
-@app.route('/api/lessons/generate', methods=['POST'])
-def generate_lessons():
-    data = request.json
-    class_id = data['class_id']
-    subject_id = data['subject_id']
-    target_quarter = int(data.get('quarter', 0))
-    days = data.get('days', [])
+@app.route('/api/add_student', methods=['POST'])
+def add_student():
+    data = load_data()
+    req_data = request.json
+    name = req_data.get('name', '').strip()
+    class_id = req_data.get('class_id')
+    group = req_data.get('group', '1')
     
-    if not days:
-        return jsonify({'status': 'error', 'message': 'Дни недели не выбраны'}), 400
+    if not name or not class_id:
+        return jsonify({"error": "Заполните имя и класс"}), 400
         
-    quarters_to_generate = [target_quarter] if target_quarter in [1, 2, 3, 4] else [1, 2, 3, 4]
-    
-    conn = get_db()
-    cursor = conn.cursor()
+    new_id = max([s['id'] for s in data['students']], default=0) + 1
+    new_student = {"id": new_id, "name": name, "class_id": int(class_id), "group": str(group)}
+    data['students'].append(new_student)
+    save_data(data)
+    return jsonify({"success": True, "student": new_student})
+
+@app.route('/api/add_students_bulk', methods=['POST'])
+def add_students_bulk():
+    data = load_data()
+    req_data = request.json
+    raw_text = req_data.get('text', '')
+    class_id = req_data.get('class_id')
+    group = str(req_data.get('group', '1'))
+
+    if not raw_text or not class_id:
+        return jsonify({"error": "Пустой список или не выбран класс"}), 400
+
+    lines = raw_text.strip().split('\n')
     added_count = 0
+    current_max_id = max([s['id'] for s in data['students']], default=0)
+
+    for line in lines:
+        cleaned_name = line.strip()
+        if cleaned_name:
+            current_max_id += 1
+            data['students'].append({
+                "id": current_max_id,
+                "name": cleaned_name,
+                "class_id": int(class_id),
+                "group": group
+            })
+            added_count += 1
+
+    save_data(data)
+    return jsonify({"success": True, "count": added_count})
+
+# УДАЛЕНИЕ УЧЕНИКА
+@app.route('/api/delete_student', methods=['POST'])
+def delete_student():
+    data = load_data()
+    req_data = request.json
+    student_id = req_data.get('student_id')
     
-    for q_num in quarters_to_generate:
-        start_dt = datetime.strptime(QUARTERS[q_num][0], "%Y-%m-%d")
-        end_dt = datetime.strptime(QUARTERS[q_num][1], "%Y-%m-%d")
+    # Удаляем ученика из списка
+    data['students'] = [s for s in data['students'] if s['id'] != student_id]
+    
+    # Удаляем его оценки
+    str_id = str(student_id)
+    if str_id in data['grades']:
+        del data['grades'][str_id]
         
-        curr = start_dt
-        while curr <= end_dt:
-            if curr.weekday() in days:
-                date_display = curr.strftime("%d.%m")
-                full_date = curr.strftime("%Y-%m-%d")
-                
-                cursor.execute("SELECT id FROM lessons WHERE class_id = ? AND subject_id = ? AND full_date = ?", 
-                               (class_id, subject_id, full_date))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO lessons (class_id, subject_id, date_str, full_date, quarter, topic, homework, work_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                   (class_id, subject_id, date_display, full_date, q_num, '', '', 'Урок'))
-                    added_count += 1
-            curr += timedelta(days=1)
+    save_data(data)
+    return jsonify({"success": True})
+
+@app.route('/api/update_student_group', methods=['POST'])
+def update_student_group():
+    data = load_data()
+    req_data = request.json
+    student_id = req_data.get('student_id')
+    new_group = str(req_data.get('group', '1'))
+    
+    for st in data['students']:
+        if st['id'] == student_id:
+            st['group'] = new_group
+            break
             
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok', 'added': added_count})
+    save_data(data)
+    return jsonify({"success": True})
 
-@app.route('/api/lessons/<int:lesson_id>', methods=['DELETE', 'PUT'])
-def handle_lesson_item(lesson_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == 'DELETE':
-        cursor.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
-    elif request.method == 'PUT':
-        data = request.json
-        cursor.execute("UPDATE lessons SET topic = ?, homework = ?, work_type = ? WHERE id = ?",
-                       (data.get('topic', ''), data.get('homework', ''), data.get('work_type', 'Урок'), lesson_id))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
-
-# === API: ЖУРНАЛ ===
-@app.route('/api/journal/<int:class_id>/<int:subject_id>', methods=['GET'])
-def get_journal(class_id, subject_id):
-    quarter = request.args.get('quarter', 0, type=int)
-    subgroup = request.args.get('subgroup', 0, type=int)
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    if subgroup in [1, 2]:
-        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? AND (subgroup = ? OR subgroup = 0) ORDER BY full_name", (class_id, subgroup))
-    else:
-        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
-        
-    students = [{'id': r[0], 'name': r[1], 'subgroup': r[2]} for r in cursor.fetchall()]
-    
-    if quarter in [1, 2, 3, 4]:
-        cursor.execute("SELECT id, date_str, topic, homework, work_type, quarter FROM lessons WHERE class_id = ? AND subject_id = ? AND quarter = ? ORDER BY full_date, id", (class_id, subject_id, quarter))
-    else:
-        cursor.execute("SELECT id, date_str, topic, homework, work_type, quarter FROM lessons WHERE class_id = ? AND subject_id = ? ORDER BY full_date, id", (class_id, subject_id))
-        
-    lessons = [{'id': r[0], 'date_str': r[1], 'topic': r[2] or '', 'homework': r[3] or '', 'work_type': r[4] or 'Урок', 'quarter': r[5]} for r in cursor.fetchall()]
-    
-    lesson_ids = [l['id'] for l in lessons]
-    grades = {}
-    
-    if lesson_ids:
-        placeholders = ','.join('?' for _ in lesson_ids)
-        cursor.execute(f"SELECT student_id, lesson_id, val FROM grades WHERE lesson_id IN ({placeholders})", lesson_ids)
-        for sid, lid, val in cursor.fetchall():
-            if str(sid) not in grades: 
-                grades[str(sid)] = {}
-            grades[str(sid)][str(lid)] = val
-        
-    conn.close()
-    return jsonify({'students': students, 'lessons': lessons, 'grades': grades})
-
-@app.route('/api/grade', methods=['POST'])
+@app.route('/api/save_grade', methods=['POST'])
 def save_grade():
-    data = request.json
-    sid, lid, val = data['student_id'], data['lesson_id'], str(data['val']).strip()
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM grades WHERE student_id = ? AND lesson_id = ?", (sid, lid))
-    if val != "":
-        cursor.execute("INSERT INTO grades (student_id, lesson_id, val) VALUES (?, ?, ?)", (sid, lid, val))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
+    data = load_data()
+    req_data = request.json
+    student_id = str(req_data.get('student_id'))
+    col_index = str(req_data.get('col_index'))
+    value = req_data.get('value', '').strip()
+    
+    if student_id not in data['grades']:
+        data['grades'][student_id] = {}
+        
+    data['grades'][student_id][col_index] = value
+    save_data(data)
+    return jsonify({"success": True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True)

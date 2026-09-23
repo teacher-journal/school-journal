@@ -2,414 +2,306 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Электронный журнал</title>
     <style>
-        :root { --primary: #0d6efd; --danger: #dc3545; --bg: #f8f9fa; --border: #dee2e6; }
-        * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: var(--bg); touch-action: manipulation; }
-        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h2 { color: #333; margin-top: 0; font-size: 18px; }
-        .breadcrumb { margin-bottom: 10px; color: #6c757d; font-size: 13px; }
-        .breadcrumb span { cursor: pointer; color: var(--primary); text-decoration: underline; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f8f9fa; color: #333; }
+        h1 { color: #2c3e50; }
         
-        .class-row { margin-bottom: 15px; }
-        .class-row-title { font-weight: bold; font-size: 14px; margin-bottom: 6px; color: #495057; border-bottom: 1px solid #e9ecef; padding-bottom: 2px; }
-        .class-row-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+        .controls { background: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .controls label { font-weight: bold; margin-right: 5px; }
+        .controls select, .controls input, .controls button { padding: 8px 12px; margin-right: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .controls button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.2s; }
+        .controls button:hover { background-color: #0056b3; }
         
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 10px; }
-        .card { background: #e9ecef; padding: 12px 20px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: bold; position: relative; font-size: 15px; min-width: 90px; }
-        .card:hover { background: #d3d3d3; }
-        .card .subtext { font-size: 11px; font-weight: normal; color: #555; }
-        .card .btn-del { position: absolute; top: 2px; right: 4px; color: var(--danger); font-size: 13px; padding: 2px; }
+        .btn-bulk { background-color: #17a2b8 !important; }
+        .btn-bulk:hover { background-color: #138496 !important; }
+
+        .group-filter-btn { background-color: #6c757d !important; font-weight: bold; }
+
+        .grades-table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+        .grades-table th, .grades-table td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
+        .grades-table th { background-color: #e9ecef; }
+        .student-name { text-align: left !important; font-weight: 500; min-width: 220px; display: flex; justify-content: space-between; align-items: center; }
         
-        .card-subj { background: #e7f1ff; border: 1px solid #b6d4fe; color: #084298; }
-        
-        .action-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; align-items: center; }
-        .btn { background: var(--primary); color: white; border: none; padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
-        .btn-gen { background: #6f42c1; }
-        .btn-subgroup { background: #fd7e14; }
-        
-        .quarter-tabs { display: flex; gap: 4px; margin-top: 8px; border-bottom: 2px solid var(--border); padding-bottom: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .q-tab { padding: 6px 10px; background: #e9ecef; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; }
-        .q-tab.active { background: var(--primary); color: white; }
-        
-        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; max-width: 100%; border: 1px solid var(--border); }
-        table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; }
-        th, td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 2px; text-align: center; background: white; }
-        th { background: #f1f3f5; font-weight: 600; }
-        
-        td.st-name, th.st-header { position: sticky; left: 0; background: #fff; z-index: 2; min-width: 170px; max-width: 190px; text-align: left; padding-left: 6px; border-right: 2px solid #ccc; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        th.st-header { background: #f1f3f5; z-index: 3; }
-        
-        input.grade-in { width: 36px; height: 32px; text-align: center; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-weight: bold; background: #fafafa; -webkit-appearance: none; }
-        input.grade-in:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 3px rgba(13,110,253,0.5); }
-        
-        .stat-col { background: #f8f9fa; font-weight: bold; min-width: 35px; }
-        .topic-cell { font-size: 9px; color: #555; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .hw-cell { font-size: 9px; color: #d63384; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-        .work-type { font-size: 8px; font-weight: bold; color: #0d6efd; display: block; }
-        
-        .sg-badge { font-size: 10px; padding: 2px 5px; border-radius: 3px; background: #e2e3e5; color: #383d41; cursor: pointer; margin-left: 4px; font-weight: bold; display: inline-block; }
-        .sg-badge.sg1 { background: #cff4fc; color: #055160; border: 1px solid #9eeaf9; }
-        .sg-badge.sg2 { background: #fff3cd; color: #664d03; border: 1px solid #ffe69c; }
+        .grade-in { width: 45px; text-align: center; border: 1px solid #ced4da; border-radius: 3px; padding: 4px; }
+        .grade-in:focus { border-color: #80bdff; outline: 0; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+
+        .stat-col { background-color: #f1f3f5; font-weight: bold; }
+        .group-badge { display: inline-block; padding: 2px 6px; font-size: 0.8em; border-radius: 4px; background: #e2e3e5; color: #383d41; cursor: pointer; }
+        .group-badge:hover { background: #d6d8db; }
+
+        .delete-btn { color: #dc3545; cursor: pointer; font-weight: bold; font-size: 0.9em; margin-left: 8px; border: none; background: none; padding: 0 4px; }
+        .delete-btn:hover { color: #a71d2a; }
+
+        /* Модальное окно массового ввода */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 8% auto; padding: 20px; border-radius: 8px; width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .modal-content textarea { width: 95%; height: 200px; font-family: inherit; padding: 8px; margin-top: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+        .modal-actions { text-align: right; margin-top: 15px; }
+        .modal-actions button { padding: 8px 16px; margin-left: 8px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="breadcrumb" id="breadcrumb">Журнал</div>
-    <div id="content"></div>
-</div>
+    <h1>Электронный журнал</h1>
 
-<script>
-let state = { step: 'classes', currentClass: null, currentSubject: null, currentQuarter: 0, currentSubgroup: 0, classes: [], subjects: [], journalData: null };
+    <div class="controls">
+        <label>Класс:</label>
+        <select id="classSelect" onchange="renderTable()">
+            <!-- Заполняется динамически -->
+        </select>
 
-async function loadClasses() {
-    state.step = 'classes'; state.currentClass = null; state.currentSubject = null;
-    const res = await fetch('/api/classes');
-    state.classes = await res.json();
-    render();
-}
+        <button onclick="addClassPrompt()">+ Добавить класс</button>
+        <button onclick="addStudentPrompt()">+ Добавить ученика</button>
+        <button class="btn-bulk" onclick="openBulkModal()">📋 Добавить списком</button>
 
-async function addClass() {
-    const name = prompt("Введите название класса (например: 7 \"В\"):");
-    if (name) {
-        await fetch('/api/classes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
-        loadClasses();
-    }
-}
+        <span style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 15px;"></span>
+        <button class="group-filter-btn" id="filterBtn" onclick="toggleFilter()">👥 Фильтр: Все ученики</button>
+    </div>
 
-async function deleteClass(id, e) {
-    e.stopPropagation();
-    if (confirm("Удалить класс и всех его учеников?")) {
-        await fetch(`/api/classes/${id}`, { method: 'DELETE' });
-        loadClasses();
-    }
-}
+    <div id="tableContainer"></div>
 
-async function loadSubjects(cls) {
-    state.step = 'subjects'; state.currentClass = cls;
-    const res = await fetch(`/api/classes/${cls.id}/subjects`);
-    state.subjects = await res.json();
-    render();
-}
+    <!-- Модальное окно для массового вставления учеников -->
+    <div id="bulkModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Добавить учеников списком</h3>
+            <p style="font-size: 0.9em; color: #555;">Вставьте список ФИО. Каждый ученик должен быть с новой строки:</p>
+            <textarea id="bulkNames" placeholder="Иванов Иван&#10;Петров Петр&#10;Сидорова Анна"></textarea>
+            
+            <div style="margin-top: 10px;">
+                <label>Подгруппа:</label>
+                <select id="bulkGroup">
+                    <option value="1">1-я подгруппа</option>
+                    <option value="2">2-я подгруппа</option>
+                </select>
+            </div>
 
-async function addSubjectToClass() {
-    const name = prompt("Введите название предмета (например: Астрономия):");
-    if (name) {
-        await fetch(`/api/classes/${state.currentClass.id}/subjects`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name})
-        });
-        loadSubjects(state.currentClass);
-    }
-}
+            <div class="modal-actions">
+                <button onclick="closeBulkModal()">Отмена</button>
+                <button style="background:#28a745; color:white; border:none;" onclick="submitBulkStudents()">Сохранить список</button>
+            </div>
+        </div>
+    </div>
 
-async function deleteClassSubject(subjId, e) {
-    e.stopPropagation();
-    if (confirm("Убрать этот предмет из класса?")) {
-        await fetch(`/api/classes/${state.currentClass.id}/subjects/${subjId}`, { method: 'DELETE' });
-        loadSubjects(state.currentClass);
-    }
-}
+    <script>
+        let journalData = { classes: [], students: [], grades: {} };
+        let currentFilter = 'ALL';
+        const NUM_COLUMNS = 15;
 
-async function loadJournal(subj, quarter = state.currentQuarter, subgroup = state.currentSubgroup) {
-    state.step = 'journal'; 
-    state.currentSubject = subj;
-    state.currentQuarter = quarter;
-    state.currentSubgroup = subgroup;
-    try {
-        const res = await fetch(`/api/journal/${state.currentClass.id}/${state.currentSubject.id}?quarter=${quarter}&subgroup=${subgroup}`);
-        state.journalData = await res.json();
-        render();
-    } catch (e) {
-        console.error(e);
-        alert("Ошибка загрузки журнала.");
-    }
-}
-
-async function addLesson() {
-    const dateStr = prompt("Введите дату урока (в формате ДД.ММ, например: 25.09):");
-    if (!dateStr) return;
-    const topic = prompt("Тема урока (необязательно):") || "";
-    const homework = prompt("Домашнее задание (необязательно):") || "";
-    const workType = prompt("Тип работы (Урок, Контрольная, Самостоятельная, ДЗ):") || "Урок";
-    
-    await fetch('/api/lessons', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ class_id: state.currentClass.id, subject_id: state.currentSubject.id, date_str: dateStr, topic, homework, work_type: workType })
-    });
-    loadJournal(state.currentSubject);
-}
-
-async function generateLessons() {
-    const qStr = prompt("Для какой четверти сгенерировать даты?\nВведите 1, 2, 3, 4 или 0 (для всего учебного года):", "1");
-    if (qStr === null) return;
-    
-    const daysStr = prompt("Введите дни недели через запятую\n(пн, вт, ср, чт, пт, сб):\nПример: вт, пт", "вт, пт");
-    if (!daysStr) return;
-
-    const dayMap = { 'пн': 0, 'вт': 1, 'ср': 2, 'чт': 3, 'пт': 4, 'сб': 5, '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5 };
-    const tokens = daysStr.toLowerCase().replace(/,/g, ' ').split(/\s+/);
-    const selectedDays = [];
-    
-    tokens.forEach(t => {
-        if (dayMap[t] !== undefined && !selectedDays.includes(dayMap[t])) {
-            selectedDays.push(dayMap[t]);
+        async function loadData() {
+            const res = await fetch('/api/get_data');
+            journalData = await res.json();
+            populateClassSelect();
+            renderTable();
         }
-    });
 
-    if (selectedDays.length === 0) {
-        alert("Не удалось распознать дни недели.");
-        return;
-    }
-
-    const res = await fetch('/api/lessons/generate', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            class_id: state.currentClass.id,
-            subject_id: state.currentSubject.id,
-            quarter: parseInt(qStr) || 0,
-            days: selectedDays
-        })
-    });
-    
-    const data = await res.json();
-    if (data.status === 'ok') {
-        alert(`Успешно добавлено уроков: ${data.added}`);
-        loadJournal(state.currentSubject, parseInt(qStr) || 0);
-    } else {
-        alert(data.message || "Ошибка при генерации");
-    }
-}
-
-async function editLesson(lesson) {
-    const action = prompt(`Урок ${lesson.date_str}\n1 - Изменить тему и ДЗ\n2 - Удалить урок\n\nВведите 1 или 2:`);
-    if (action === '1') {
-        const topic = prompt("Тема урока:", lesson.topic) ?? lesson.topic;
-        const homework = prompt("Домашнее задание (ДЗ):", lesson.homework) ?? lesson.homework;
-        const work_type = prompt("Тип работы:", lesson.work_type) ?? lesson.work_type;
-        await fetch(`/api/lessons/${lesson.id}`, {
-            method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic, homework, work_type})
-        });
-        loadJournal(state.currentSubject);
-    } else if (action === '2') {
-        if (confirm("Удалить этот урок и все оценки за него?")) {
-            await fetch(`/api/lessons/${lesson.id}`, { method: 'DELETE' });
-            loadJournal(state.currentSubject);
+        function extractGradeNum(className) {
+            const match = className.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 999;
         }
-    }
-}
 
-async function addStudent() {
-    const name = prompt("Введите ФИО нового ученика:");
-    if (!name) return;
-    
-    const sgStr = prompt("Укажите подгруппу для ученика:\n0 - Весь класс (без деления)\n1 - 1-я подгруппа\n2 - 2-я подгруппа", state.currentSubgroup || "0");
-    const sg = parseInt(sgStr);
-    const subgroup = [0, 1, 2].includes(sg) ? sg : 0;
+        function populateClassSelect() {
+            const select = document.getElementById('classSelect');
+            const currentVal = select.value;
+            select.innerHTML = '';
 
-    await fetch(`/api/classes/${state.currentClass.id}/students`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({full_name: name, subgroup})
-    });
-    loadJournal(state.currentSubject);
-}
+            if (journalData.classes.length === 0) return;
 
-async function toggleStudentSubgroup(studentId, currentSg) {
-    const nextSg = (currentSg + 1) % 3; // Переключение: Все -> 1 подгруппа -> 2 подгруппа
-    await fetch(`/api/students/${studentId}`, {
-        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({subgroup: nextSg})
-    });
-    loadJournal(state.currentSubject);
-}
+            const sortedClasses = [...journalData.classes].sort((a, b) => {
+                const numA = extractGradeNum(a.name);
+                const numB = extractGradeNum(b.name);
+                if (numA !== numB) return numA - numB;
+                return a.name.localeCompare(b.name, 'ru');
+            });
 
-async function deleteStudent(id, name) {
-    if (confirm(`Удалить ученика ${name}?`)) {
-        await fetch(`/api/students/${id}`, { method: 'DELETE' });
-        loadJournal(state.currentSubject);
-    }
-}
+            sortedClasses.forEach(cls => {
+                const opt = document.createElement('option');
+                opt.value = cls.id;
+                opt.textContent = cls.name;
+                select.appendChild(opt);
+            });
 
-async function saveGrade(studentId, lessonId, val) {
-    await fetch('/api/grade', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ student_id: studentId, lesson_id: lessonId, val: val })
-    });
-    if (!state.journalData.grades[studentId]) state.journalData.grades[studentId] = {};
-    state.journalData.grades[studentId][lessonId] = val;
-    updateStats(studentId);
-}
-
-function updateStats(studentId) {
-    let sum = 0, count = 0, n_count = 0;
-    const stGrades = state.journalData.grades[studentId] || state.journalData.grades[String(studentId)] || {};
-    
-    state.journalData.lessons.forEach(l => {
-        const v = stGrades[l.id] || stGrades[String(l.id)];
-        if (v) {
-            if (v.toLowerCase() === 'н') n_count++;
-            else {
-                const num = parseFloat(v);
-                if (!isNaN(num)) { sum += num; count++; }
+            if (currentVal && sortedClasses.some(c => c.id == currentVal)) {
+                select.value = currentVal;
             }
         }
-    });
-    
-    document.getElementById(`avg-${studentId}`).innerText = count > 0 ? (sum / count).toFixed(2) : '-';
-    document.getElementById(`n-${studentId}`).innerText = n_count;
-    document.getElementById(`q-${studentId}`).innerText = count > 0 ? Math.round(sum / count) : '-';
-}
 
-function render() {
-    const bc = document.getElementById('breadcrumb');
-    const content = document.getElementById('content');
-    
-    let navHtml = `<span onclick="loadClasses()">Классы</span>`;
-    if (state.currentClass) navHtml += ` &gt; <span onclick="loadSubjects(state.currentClass)">${state.currentClass.name}</span>`;
-    if (state.currentSubject) navHtml += ` &gt; <b>${state.currentSubject.name}</b>`;
-    bc.innerHTML = navHtml;
+        function toggleFilter() {
+            if (currentFilter === 'ALL') currentFilter = '1';
+            else if (currentFilter === '1') currentFilter = '2';
+            else currentFilter = 'ALL';
 
-    if (state.step === 'classes') {
-        // Группировка классов по параллелям (5, 6, 7, 8...)
-        const grouped = {};
-        state.classes.forEach(c => {
-            const num = c.name.match(/\d+/)?.[0] || 'Другие';
-            if (!grouped[num]) grouped[num] = [];
-            grouped[num].push(c);
-        });
+            const btn = document.getElementById('filterBtn');
+            if (currentFilter === 'ALL') btn.textContent = '👥 Фильтр: Все ученики';
+            else if (currentFilter === '1') btn.textContent = '👤 Фильтр: 1-я подгруппа';
+            else btn.textContent = '👤 Фильтр: 2-я подгруппа';
 
-        let html = `
-            <div class="action-bar" style="justify-content: space-between;">
-                <h2>Выберите класс</h2>
-                <button class="btn" onclick="addClass()">+ Добавить класс</button>
-            </div>
-            <div>`;
-        
-        Object.keys(grouped).sort((a,b) => parseInt(a) - parseInt(b)).forEach(grade => {
-            html += `
-            <div class="class-row">
-                <div class="class-row-title">${grade !== 'Другие' ? grade + ' параллель' : 'Прочие'}</div>
-                <div class="class-row-cards">`;
-                
-            grouped[grade].forEach(c => {
-                html += `
-                <div class="card" onclick='loadSubjects(${JSON.stringify(c)})'>
-                    <span class="btn-del" onclick="deleteClass(${c.id}, event)" title="Удалить">✖</span>
-                    <div>${c.name}</div>
-                    <div class="subtext">${c.students_count} уч.</div>
-                </div>`;
+            renderTable();
+        }
+
+        async function switchGroup(studentId, currentGroup) {
+            const newGroup = currentGroup === '1' ? '2' : '1';
+            await fetch('/api/update_student_group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: studentId, group: newGroup })
             });
+            await loadData();
+        }
+
+        async function deleteStudent(studentId, name) {
+            if (confirm(`Вы действительно хотите удалить ученика "${name}"?`)) {
+                await fetch('/api/delete_student', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId })
+                });
+                await loadData();
+            }
+        }
+
+        function renderTable() {
+            const classId = document.getElementById('classSelect').value;
+            const container = document.getElementById('tableContainer');
             
-            html += `</div></div>`;
-        });
-        
-        html += `</div>`;
-        content.innerHTML = html;
-    } else if (state.step === 'subjects') {
-        let html = `
-            <div class="action-bar" style="justify-content: space-between;">
-                <h2>Класс ${state.currentClass.name}</h2>
-                <button class="btn" onclick="addSubjectToClass()">+ Предмет</button>
-            </div>
-            <div class="grid">`;
-        state.subjects.forEach(s => {
-            html += `<div class="card card-subj" onclick='loadJournal(${JSON.stringify(s)})'>
-                <span class="btn-del" onclick="deleteClassSubject(${s.id}, event)" title="Убрать">✖</span>
-                ${s.name}
-            </div>`;
-        });
-        html += `</div>`;
-        content.innerHTML = html;
-    } else if (state.step === 'journal') {
-        const lessons = (state.journalData && state.journalData.lessons) ? state.journalData.lessons : [];
-        const students = (state.journalData && state.journalData.students) ? state.journalData.students : [];
-        const grades = (state.journalData && state.journalData.grades) ? state.journalData.grades : {};
+            if (!classId) {
+                container.innerHTML = '<p>Выберите или создайте класс.</p>';
+                return;
+            }
 
-        let sgLabel = "Все ученики";
-        if (state.currentSubgroup === 1) sgLabel = "1 подгруппа";
-        if (state.currentSubgroup === 2) sgLabel = "2 подгруппа";
+            let filteredStudents = journalData.students.filter(s => s.class_id == classId);
 
-        let html = `
-            <div class="action-bar">
-                <button class="btn btn-gen" onclick="generateLessons()">📅 Даты</button>
-                <button class="btn" onclick="addLesson()">+ Урок</button>
-                <button class="btn" style="background:#198754" onclick="addStudent()">+ Ученик</button>
-                <button class="btn btn-subgroup" onclick="loadJournal(state.currentSubject, state.currentQuarter, (state.currentSubgroup + 1) % 3)">👥 Фильтр: ${sgLabel}</button>
-            </div>
+            if (currentFilter !== 'ALL') {
+                filteredStudents = filteredStudents.filter(s => (s.group || '1') === currentFilter);
+            }
 
-            <div class="quarter-tabs">
-                <div class="q-tab ${state.currentQuarter === 0 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 0, state.currentSubgroup)">Весь год</div>
-                <div class="q-tab ${state.currentQuarter === 1 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 1, state.currentSubgroup)">1 Четв.</div>
-                <div class="q-tab ${state.currentQuarter === 2 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 2, state.currentSubgroup)">2 Четв.</div>
-                <div class="q-tab ${state.currentQuarter === 3 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 3, state.currentSubgroup)">3 Четв.</div>
-                <div class="q-tab ${state.currentQuarter === 4 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 4, state.currentSubgroup)">4 Четв.</div>
-            </div>
+            filteredStudents.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
-            <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th rowspan="3" class="st-header">ФИО Учащегося</th>
-                        ${lessons.map(l => `<th onclick='editLesson(${JSON.stringify(l)})' style="cursor:pointer">
-                            ${l.date_str}
-                            <span class="work-type">${l.work_type !== 'Урок' ? l.work_type : ''}</span>
-                        </th>`).join('')}
-                        <th rowspan="3" class="stat-col">Ср</th>
-                        <th rowspan="3" class="stat-col">Н</th>
-                        <th rowspan="3" class="stat-col">Чтв</th>
-                    </tr>
-                    <tr>
-                        ${lessons.map(l => `<th class="topic-cell" onclick='editLesson(${JSON.stringify(l)})' title="Тема: ${l.topic}">${l.topic || '—'}</th>`).join('')}
-                    </tr>
-                    <tr>
-                        ${lessons.map(l => `<th class="hw-cell" onclick='editLesson(${JSON.stringify(l)})' title="ДЗ: ${l.homework}">${l.homework ? 'ДЗ: ' + l.homework : '—'}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>`;
-                
-        students.forEach(st => {
-            const stGrades = grades[st.id] || grades[String(st.id)] || {};
-            let sum = 0, count = 0, n_count = 0;
-
-            let sgClass = "";
-            let sgText = "Общий";
-            if (st.subgroup === 1) { sgClass = "sg1"; sgText = "1 подгр"; }
-            if (st.subgroup === 2) { sgClass = "sg2"; sgText = "2 подгр"; }
-
-            html += `<tr><td class="st-name">
-                <span style="color:var(--danger);cursor:pointer;margin-right:3px" onclick="deleteStudent(${st.id}, '${st.name}')">✖</span>
-                ${st.name}
-                <span class="sg-badge ${sgClass}" onclick="toggleStudentSubgroup(${st.id}, ${st.subgroup})" title="Нажмите, чтобы сменить подгруппу ученика">${sgText}</span>
-            </td>`;
+            let html = '<table class="grades-table"><thead><tr>';
+            html += '<th>№</th><th>Ученик</th>';
             
-            lessons.forEach(l => {
-                const val = stGrades[l.id] || stGrades[String(l.id)] || '';
-                if (val) {
+            for (let i = 1; i <= NUM_COLUMNS; i++) {
+                html += `<th>Урок ${i}</th>`;
+            }
+            html += '<th class="stat-col">Средний</th><th class="stat-col">Н-ки</th><th class="stat-col">Четверть</th></tr></thead><tbody>';
+
+            filteredStudents.forEach((st, idx) => {
+                const stGroup = st.group || '1';
+                html += `<tr>`;
+                html += `<td>${idx + 1}</td>`;
+                html += `<td class="student-name">
+                            <span>${st.name}</span> 
+                            <div>
+                                <span class="group-badge" onclick="switchGroup(${st.id}, '${stGroup}')" title="Нажмите, чтобы сменить подгруппу">гр. ${stGroup}</span>
+                                <button class="delete-btn" onclick="deleteStudent(${st.id}, '${st.name}')" title="Удалить ученика">❌</button>
+                            </div>
+                         </td>`;
+
+                let sum = 0;
+                let count = 0;
+                let n_count = 0;
+
+                for (let c = 1; c <= NUM_COLUMNS; c++) {
+                    const val = (journalData.grades[st.id] && journalData.grades[st.id][c]) ? journalData.grades[st.id][c] : '';
+                    html += `<td><input class="grade-in" value="${val}" onchange="saveGrade(${st.id}, ${c}, this.value)" /></td>`;
+
                     if (val.toLowerCase() === 'н') n_count++;
                     else {
                         const num = parseFloat(val);
                         if (!isNaN(num)) { sum += num; count++; }
                     }
                 }
-                html += `<td><input class="grade-in" value="${val}" onchange="saveGrade(${st.id}, ${l.id}, this.value)" /></td>`;
+
+                const avg = count > 0 ? (sum / count).toFixed(2) : '-';
+                const finalGrade = count > 0 ? Math.round(sum / count) : '-';
+
+                html += `<td class="stat-col" id="avg-${st.id}">${avg}</td>`;
+                html += `<td class="stat-col" id="n-${st.id}">${n_count}</td>`;
+                html += `<td class="stat-col" id="q-${st.id}">${finalGrade}</td>`;
+                html += `</tr>`;
             });
-            
-            const avg = count > 0 ? (sum / count).toFixed(2) : '-';
-            const finalGrade = count > 0 ? Math.round(sum / count) : '-';
 
-            html += `
-                <td class="stat-col" id="avg-${st.id}">${avg}</td>
-                <td class="stat-col" id="n-${st.id}">${n_count}</td>
-                <td class="stat-col" id="q-${st.id}">${finalGrade}</td>
-            </tr>`;
-        });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
 
-        html += `</tbody></table></div>`;
-        content.innerHTML = html;
-    }
-}
+        async function saveGrade(studentId, colIndex, value) {
+            if (!journalData.grades[studentId]) journalData.grades[studentId] = {};
+            journalData.grades[studentId][colIndex] = value;
 
-loadClasses();
-</script>
+            renderTable();
+
+            await fetch('/api/save_grade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: studentId, col_index: colIndex, value: value })
+            });
+        }
+
+        async function addClassPrompt() {
+            const name = prompt('Введите название класса (например, 5 А):');
+            if (name) {
+                await fetch('/api/add_class', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                await loadData();
+            }
+        }
+
+        async function addStudentPrompt() {
+            const classId = document.getElementById('classSelect').value;
+            if (!classId) return alert('Сначала выберите класс!');
+
+            const name = prompt('Введите ФИО ученика:');
+            if (name) {
+                const group = prompt('Введите номер подгруппы (1 или 2):', '1');
+                await fetch('/api/add_student', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, class_id: classId, group: group || '1' })
+                });
+                await loadData();
+            }
+        }
+
+        function openBulkModal() {
+            const classId = document.getElementById('classSelect').value;
+            if (!classId) return alert('Сначала выберите класс!');
+            document.getElementById('bulkNames').value = '';
+            document.getElementById('bulkModal').style.display = 'block';
+        }
+
+        function closeBulkModal() {
+            document.getElementById('bulkModal').style.display = 'none';
+        }
+
+        async function submitBulkStudents() {
+            const classId = document.getElementById('classSelect').value;
+            const text = document.getElementById('bulkNames').value;
+            const group = document.getElementById('bulkGroup').value;
+
+            if (!text.trim()) {
+                alert('Пожалуйста, вставьте хотя бы одно имя/фамилию!');
+                return;
+            }
+
+            const res = await fetch('/api/add_students_bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_id: classId, text: text, group: group })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                alert(`Успешно добавлено учеников: ${data.count}`);
+                closeBulkModal();
+                await loadData();
+            }
+        }
+
+        loadData();
+    </script>
 </body>
 </html>

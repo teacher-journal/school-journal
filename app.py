@@ -13,12 +13,6 @@ QUARTERS = {
     4: ('2027-04-05', '2027-05-29')
 }
 
-DAY_MAP = {
-    'пн': 0, 'вт': 1, 'ср': 2, 'чт': 3, 'пт': 4, 'сб': 5,
-    'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5,
-    '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5
-}
-
 DB_PATH = os.path.join(os.path.dirname(__file__), 'journal.db')
 
 def get_db():
@@ -46,9 +40,14 @@ def init_db():
     )''')
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT, class_id INTEGER,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT, class_id INTEGER, subgroup INTEGER DEFAULT 0,
         FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE
     )''')
+    
+    cursor.execute("PRAGMA table_info(students)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'subgroup' not in columns:
+        cursor.execute("ALTER TABLE students ADD COLUMN subgroup INTEGER DEFAULT 0")
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS lessons (
         id INTEGER PRIMARY KEY AUTOINCREMENT, class_id INTEGER, subject_id INTEGER,
@@ -56,12 +55,6 @@ def init_db():
         FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
         FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
     )''')
-    
-    # Проверка на наличие колонки homework для старых баз
-    cursor.execute("PRAGMA table_info(lessons)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'homework' not in columns:
-        cursor.execute("ALTER TABLE lessons ADD COLUMN homework TEXT DEFAULT ''")
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS grades (
         id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER, lesson_id INTEGER, val TEXT,
@@ -71,7 +64,7 @@ def init_db():
     
     cursor.execute("SELECT COUNT(*) FROM classes")
     if cursor.fetchone()[0] == 0:
-        classes = ['6 "А"', '6 "Б"', '7 "А"', '7 "Б"', '8 "А"', '8 "Б"', '9 "А"', '9 "Б"', '10 "А"', '10 "Б"']
+        classes = ['5 "А"', '5 "Б"', '6 "А"', '6 "Б"', '6 "В"', '7 "А"', '7 "Б"', '8 "А"', '8 "Б"', '9 "А"', '9 "Б"']
         for c in classes:
             cursor.execute("INSERT INTO classes (name) VALUES (?)", (c,))
             
@@ -87,12 +80,6 @@ def init_db():
             for sid in s_ids:
                 cursor.execute("INSERT INTO class_subjects (class_id, subject_id) VALUES (?, ?)", (cid, sid))
 
-        cursor.execute("SELECT id FROM classes WHERE name = '6 \"А\"'")
-        c6a = cursor.fetchone()
-        if c6a:
-            for st in ['Иванов Иван', 'Петров Пётр', 'Сидорова Анна', 'Смирнов Алексей']:
-                cursor.execute("INSERT INTO students (full_name, class_id) VALUES (?, ?)", (st, c6a[0]))
-                
     conn.commit()
     conn.close()
 
@@ -168,33 +155,39 @@ def delete_class_subject(class_id, subject_id):
     conn.close()
     return jsonify({'status': 'ok'})
 
-# === API: УЧАЩИЕСЯ ===
+# === API: УЧАЩИЕСЯ И ПОДГРУППЫ ===
 @app.route('/api/classes/<int:class_id>/students', methods=['GET', 'POST'])
 def handle_students(class_id):
     conn = get_db()
     cursor = conn.cursor()
     if request.method == 'POST':
         full_name = request.json.get('full_name')
+        subgroup = request.json.get('subgroup', 0)
         if full_name:
-            cursor.execute("INSERT INTO students (full_name, class_id) VALUES (?, ?)", (full_name, class_id))
+            cursor.execute("INSERT INTO students (full_name, class_id, subgroup) VALUES (?, ?, ?)", (full_name, class_id, subgroup))
             conn.commit()
         conn.close()
         return jsonify({'status': 'ok'})
     else:
-        cursor.execute("SELECT id, full_name FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
+        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
         rows = cursor.fetchall()
         conn.close()
-        return jsonify([{'id': r[0], 'full_name': r[1]} for r in rows])
+        return jsonify([{'id': r[0], 'full_name': r[1], 'subgroup': r[2]} for r in rows])
 
-@app.route('/api/students/<int:student_id>', methods=['DELETE'])
-def delete_student(student_id):
+@app.route('/api/students/<int:student_id>', methods=['DELETE', 'PUT'])
+def handle_student_item(student_id):
     conn = get_db()
-    conn.execute("DELETE FROM students WHERE id = ?", (student_id,))
+    cursor = conn.cursor()
+    if request.method == 'DELETE':
+        cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
+    elif request.method == 'PUT':
+        subgroup = request.json.get('subgroup', 0)
+        cursor.execute("UPDATE students SET subgroup = ? WHERE id = ?", (subgroup, student_id))
     conn.commit()
     conn.close()
     return jsonify({'status': 'ok'})
 
-# === API: УРОКИ И АВТОГЕНЕРАЦИЯ ===
+# === API: УРОКИ ===
 @app.route('/api/lessons', methods=['POST'])
 def add_lesson():
     data = request.json
@@ -277,12 +270,17 @@ def handle_lesson_item(lesson_id):
 @app.route('/api/journal/<int:class_id>/<int:subject_id>', methods=['GET'])
 def get_journal(class_id, subject_id):
     quarter = request.args.get('quarter', 0, type=int)
+    subgroup = request.args.get('subgroup', 0, type=int)
     
     conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT id, full_name FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
-    students = [{'id': r[0], 'name': r[1]} for r in cursor.fetchall()]
+    if subgroup in [1, 2]:
+        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? AND (subgroup = ? OR subgroup = 0) ORDER BY full_name", (class_id, subgroup))
+    else:
+        cursor.execute("SELECT id, full_name, subgroup FROM students WHERE class_id = ? ORDER BY full_name", (class_id,))
+        
+    students = [{'id': r[0], 'name': r[1], 'subgroup': r[2]} for r in cursor.fetchall()]
     
     if quarter in [1, 2, 3, 4]:
         cursor.execute("SELECT id, date_str, topic, homework, work_type, quarter FROM lessons WHERE class_id = ? AND subject_id = ? AND quarter = ? ORDER BY full_date, id", (class_id, subject_id, quarter))

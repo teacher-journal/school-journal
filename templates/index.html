@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Электронный журнал</title>
+    <style>
+        :root { --primary: #0d6efd; --danger: #dc3545; --bg: #f8f9fa; --border: #dee2e6; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: var(--bg); touch-action: manipulation; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-top: 0; font-size: 18px; }
+        .breadcrumb { margin-bottom: 10px; color: #6c757d; font-size: 13px; }
+        .breadcrumb span { cursor: pointer; color: var(--primary); text-decoration: underline; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 10px; }
+        .card { background: #e9ecef; padding: 12px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: bold; position: relative; font-size: 14px; }
+        .card:hover { background: #d3d3d3; }
+        .card .subtext { font-size: 11px; font-weight: normal; color: #555; }
+        .card .btn-del { position: absolute; top: 4px; right: 6px; color: var(--danger); font-size: 14px; padding: 4px; }
+        
+        .card-subj { background: #e7f1ff; border: 1px solid #b6d4fe; color: #084298; }
+        
+        .action-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .btn { background: var(--primary); color: white; border: none; padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .btn-gen { background: #6f42c1; }
+        
+        .quarter-tabs { display: flex; gap: 4px; margin-top: 8px; border-bottom: 2px solid var(--border); padding-bottom: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .q-tab { padding: 6px 10px; background: #e9ecef; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; }
+        .q-tab.active { background: var(--primary); color: white; }
+        
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; max-width: 100%; border: 1px solid var(--border); }
+        table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; }
+        th, td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 2px; text-align: center; background: white; }
+        th { background: #f1f3f5; font-weight: 600; }
+        
+        td.st-name, th.st-header { position: sticky; left: 0; background: #fff; z-index: 2; min-width: 130px; max-width: 150px; text-align: left; padding-left: 6px; border-right: 2px solid #ccc; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        th.st-header { background: #f1f3f5; z-index: 3; }
+        
+        input.grade-in { width: 36px; height: 32px; text-align: center; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-weight: bold; background: #fafafa; -webkit-appearance: none; }
+        input.grade-in:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 3px rgba(13,110,253,0.5); }
+        
+        .stat-col { background: #f8f9fa; font-weight: bold; min-width: 35px; }
+        .topic-cell { font-size: 9px; color: #555; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hw-cell { font-size: 9px; color: #d63384; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .work-type { font-size: 8px; font-weight: bold; color: #0d6efd; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="breadcrumb" id="breadcrumb">Журнал</div>
+    <div id="content"></div>
+</div>
+
+<script>
+let state = { step: 'classes', currentClass: null, currentSubject: null, currentQuarter: 0, classes: [], subjects: [], journalData: null };
+
+async function loadClasses() {
+    state.step = 'classes'; state.currentClass = null; state.currentSubject = null;
+    const res = await fetch('/api/classes');
+    state.classes = await res.json();
+    render();
+}
+
+async function addClass() {
+    const name = prompt("Введите название класса (например: 11 \"А\"):");
+    if (name) {
+        await fetch('/api/classes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
+        loadClasses();
+    }
+}
+
+async function deleteClass(id, e) {
+    e.stopPropagation();
+    if (confirm("Удалить класс и всех его учеников?")) {
+        await fetch(`/api/classes/${id}`, { method: 'DELETE' });
+        loadClasses();
+    }
+}
+
+async function loadSubjects(cls) {
+    state.step = 'subjects'; state.currentClass = cls;
+    const res = await fetch(`/api/classes/${cls.id}/subjects`);
+    state.subjects = await res.json();
+    render();
+}
+
+async function addSubjectToClass() {
+    const name = prompt("Введите название предмета (например: Астрономия):");
+    if (name) {
+        await fetch(`/api/classes/${state.currentClass.id}/subjects`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name})
+        });
+        loadSubjects(state.currentClass);
+    }
+}
+
+async function deleteClassSubject(subjId, e) {
+    e.stopPropagation();
+    if (confirm("Убрать этот предмет из класса?")) {
+        await fetch(`/api/classes/${state.currentClass.id}/subjects/${subjId}`, { method: 'DELETE' });
+        loadSubjects(state.currentClass);
+    }
+}
+
+async function loadJournal(subj, quarter = state.currentQuarter) {
+    state.step = 'journal'; 
+    state.currentSubject = subj;
+    state.currentQuarter = quarter;
+    try {
+        const res = await fetch(`/api/journal/${state.currentClass.id}/${state.currentSubject.id}?quarter=${quarter}`);
+        state.journalData = await res.json();
+        render();
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка загрузки журнала.");
+    }
+}
+
+async function addLesson() {
+    const dateStr = prompt("Введите дату урока (в формате ДД.ММ, например: 25.09):");
+    if (!dateStr) return;
+    const topic = prompt("Тема урока (необязательно):") || "";
+    const homework = prompt("Домашнее задание (необязательно):") || "";
+    const workType = prompt("Тип работы (Урок, Контрольная, Самостоятельная, ДЗ):") || "Урок";
+    
+    await fetch('/api/lessons', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ class_id: state.currentClass.id, subject_id: state.currentSubject.id, date_str: dateStr, topic, homework, work_type: workType })
+    });
+    loadJournal(state.currentSubject);
+}
+
+async function generateLessons() {
+    const qStr = prompt("Для какой четверти сгенерировать даты?\nВведите 1, 2, 3, 4 или 0 (для всего учебного года):", "1");
+    if (qStr === null) return;
+    
+    const daysStr = prompt("Введите дни недели через запятую\n(пн, вт, ср, чт, пт, сб):\nПример: вт, пт", "вт, пт");
+    if (!daysStr) return;
+
+    const dayMap = { 'пн': 0, 'вт': 1, 'ср': 2, 'чт': 3, 'пт': 4, 'сб': 5, '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5 };
+    const tokens = daysStr.toLowerCase().replace(/,/g, ' ').split(/\s+/);
+    const selectedDays = [];
+    
+    tokens.forEach(t => {
+        if (dayMap[t] !== undefined && !selectedDays.includes(dayMap[t])) {
+            selectedDays.push(dayMap[t]);
+        }
+    });
+
+    if (selectedDays.length === 0) {
+        alert("Не удалось распознать дни недели.");
+        return;
+    }
+
+    const res = await fetch('/api/lessons/generate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            class_id: state.currentClass.id,
+            subject_id: state.currentSubject.id,
+            quarter: parseInt(qStr) || 0,
+            days: selectedDays
+        })
+    });
+    
+    const data = await res.json();
+    if (data.status === 'ok') {
+        alert(`Успешно добавлено уроков: ${data.added}`);
+        loadJournal(state.currentSubject, parseInt(qStr) || 0);
+    } else {
+        alert(data.message || "Ошибка при генерации");
+    }
+}
+
+async function editLesson(lesson) {
+    const action = prompt(`Урок ${lesson.date_str}\n1 - Изменить тему и ДЗ\n2 - Удалить урок\n\nВведите 1 или 2:`);
+    if (action === '1') {
+        const topic = prompt("Тема урока:", lesson.topic) ?? lesson.topic;
+        const homework = prompt("Домашнее задание (ДЗ):", lesson.homework) ?? lesson.homework;
+        const work_type = prompt("Тип работы:", lesson.work_type) ?? lesson.work_type;
+        await fetch(`/api/lessons/${lesson.id}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic, homework, work_type})
+        });
+        loadJournal(state.currentSubject);
+    } else if (action === '2') {
+        if (confirm("Удалить этот урок и все оценки за него?")) {
+            await fetch(`/api/lessons/${lesson.id}`, { method: 'DELETE' });
+            loadJournal(state.currentSubject);
+        }
+    }
+}
+
+async function addStudent() {
+    const name = prompt("Введите ФИО нового ученика:");
+    if (name) {
+        await fetch(`/api/classes/${state.currentClass.id}/students`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({full_name: name})
+        });
+        loadJournal(state.currentSubject);
+    }
+}
+
+async function deleteStudent(id, name) {
+    if (confirm(`Удалить ученика ${name}?`)) {
+        await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        loadJournal(state.currentSubject);
+    }
+}
+
+async function saveGrade(studentId, lessonId, val) {
+    await fetch('/api/grade', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ student_id: studentId, lesson_id: lessonId, val: val })
+    });
+    if (!state.journalData.grades[studentId]) state.journalData.grades[studentId] = {};
+    state.journalData.grades[studentId][lessonId] = val;
+    updateStats(studentId);
+}
+
+function updateStats(studentId) {
+    let sum = 0, count = 0, n_count = 0;
+    const stGrades = state.journalData.grades[studentId] || state.journalData.grades[String(studentId)] || {};
+    
+    state.journalData.lessons.forEach(l => {
+        const v = stGrades[l.id] || stGrades[String(l.id)];
+        if (v) {
+            if (v.toLowerCase() === 'н') n_count++;
+            else {
+                const num = parseFloat(v);
+                if (!isNaN(num)) { sum += num; count++; }
+            }
+        }
+    });
+    
+    document.getElementById(`avg-${studentId}`).innerText = count > 0 ? (sum / count).toFixed(2) : '-';
+    document.getElementById(`n-${studentId}`).innerText = n_count;
+    document.getElementById(`q-${studentId}`).innerText = count > 0 ? Math.round(sum / count) : '-';
+}
+
+function render() {
+    const bc = document.getElementById('breadcrumb');
+    const content = document.getElementById('content');
+    
+    let navHtml = `<span onclick="loadClasses()">Классы</span>`;
+    if (state.currentClass) navHtml += ` &gt; <span onclick="loadSubjects(state.currentClass)">${state.currentClass.name}</span>`;
+    if (state.currentSubject) navHtml += ` &gt; <b>${state.currentSubject.name}</b>`;
+    bc.innerHTML = navHtml;
+
+    if (state.step === 'classes') {
+        let html = `
+            <div class="action-bar" style="justify-content: space-between; align-items: center;">
+                <h2>Выберите класс</h2>
+                <button class="btn" onclick="addClass()">+ Класс</button>
+            </div>
+            <div class="grid">`;
+        state.classes.forEach(c => {
+            html += `<div class="card" onclick='loadSubjects(${JSON.stringify(c)})'>
+                <span class="btn-del" onclick="deleteClass(${c.id}, event)" title="Удалить">✖</span>
+                <div>${c.name}</div>
+                <div class="subtext">${c.students_count} уч.</div>
+            </div>`;
+        });
+        html += `</div>`;
+        content.innerHTML = html;
+    } else if (state.step === 'subjects') {
+        let html = `
+            <div class="action-bar" style="justify-content: space-between; align-items: center;">
+                <h2>Класс ${state.currentClass.name}</h2>
+                <button class="btn" onclick="addSubjectToClass()">+ Предмет</button>
+            </div>
+            <div class="grid">`;
+        state.subjects.forEach(s => {
+            html += `<div class="card card-subj" onclick='loadJournal(${JSON.stringify(s)})'>
+                <span class="btn-del" onclick="deleteClassSubject(${s.id}, event)" title="Убрать">✖</span>
+                ${s.name}
+            </div>`;
+        });
+        html += `</div>`;
+        content.innerHTML = html;
+    } else if (state.step === 'journal') {
+        const lessons = (state.journalData && state.journalData.lessons) ? state.journalData.lessons : [];
+        const students = (state.journalData && state.journalData.students) ? state.journalData.students : [];
+        const grades = (state.journalData && state.journalData.grades) ? state.journalData.grades : {};
+
+        let html = `
+            <div class="action-bar">
+                <button class="btn btn-gen" onclick="generateLessons()">📅 Даты</button>
+                <button class="btn" onclick="addLesson()">+ Урок</button>
+                <button class="btn" style="background:#198754" onclick="addStudent()">+ Ученик</button>
+            </div>
+
+            <div class="quarter-tabs">
+                <div class="q-tab ${state.currentQuarter === 0 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 0)">Весь год</div>
+                <div class="q-tab ${state.currentQuarter === 1 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 1)">1 Четв.</div>
+                <div class="q-tab ${state.currentQuarter === 2 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 2)">2 Четв.</div>
+                <div class="q-tab ${state.currentQuarter === 3 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 3)">3 Четв.</div>
+                <div class="q-tab ${state.currentQuarter === 4 ? 'active' : ''}" onclick="loadJournal(state.currentSubject, 4)">4 Четв.</div>
+            </div>
+
+            <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="3" class="st-header">ФИО Учащегося</th>
+                        ${lessons.map(l => `<th onclick='editLesson(${JSON.stringify(l)})' style="cursor:pointer">
+                            ${l.date_str}
+                            <span class="work-type">${l.work_type !== 'Урок' ? l.work_type : ''}</span>
+                        </th>`).join('')}
+                        <th rowspan="3" class="stat-col">Ср</th>
+                        <th rowspan="3" class="stat-col">Н</th>
+                        <th rowspan="3" class="stat-col">Чтв</th>
+                    </tr>
+                    <tr>
+                        ${lessons.map(l => `<th class="topic-cell" onclick='editLesson(${JSON.stringify(l)})' title="Тема: ${l.topic}">${l.topic || '—'}</th>`).join('')}
+                    </tr>
+                    <tr>
+                        ${lessons.map(l => `<th class="hw-cell" onclick='editLesson(${JSON.stringify(l)})' title="ДЗ: ${l.homework}">${l.homework ? 'ДЗ: ' + l.homework : '—'}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>`;
+                
+        students.forEach(st => {
+            const stGrades = grades[st.id] || grades[String(st.id)] || {};
+            let sum = 0, count = 0, n_count = 0;
+
+            html += `<tr><td class="st-name">
+                <span style="color:var(--danger);cursor:pointer;margin-right:3px" onclick="deleteStudent(${st.id}, '${st.name}')">✖</span>
+                ${st.name}
+            </td>`;
+            
+            lessons.forEach(l => {
+                const val = stGrades[l.id] || stGrades[String(l.id)] || '';
+                if (val) {
+                    if (val.toLowerCase() === 'н') n_count++;
+                    else {
+                        const num = parseFloat(val);
+                        if (!isNaN(num)) { sum += num; count++; }
+                    }
+                }
+                html += `<td><input class="grade-in" value="${val}" onchange="saveGrade(${st.id}, ${l.id}, this.value)" /></td>`;
+            });
+            
+            const avg = count > 0 ? (sum / count).toFixed(2) : '-';
+            const finalGrade = count > 0 ? Math.round(sum / count) : '-';
+
+            html += `
+                <td class="stat-col" id="avg-${st.id}">${avg}</td>
+                <td class="stat-col" id="n-${st.id}">${n_count}</td>
+                <td class="stat-col" id="q-${st.id}">${finalGrade}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        content.innerHTML = html;
+    }
+}
+
+loadClasses();
+</script>
+</body>
+</html>

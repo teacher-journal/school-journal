@@ -4,72 +4,92 @@
     <meta charset="UTF-8">
     <title>Электронный журнал</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f8f9fa; color: #333; }
-        h1 { color: #2c3e50; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 15px; background-color: #f5f6f8; color: #333; }
         
-        .controls { background: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .controls label { font-weight: bold; margin-right: 5px; }
-        .controls select, .controls input, .controls button { padding: 8px 12px; margin-right: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .controls button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.2s; }
-        .controls button:hover { background-color: #0056b3; }
+        .breadcrumb { font-size: 0.9em; color: #0056b3; margin-bottom: 12px; font-weight: 500; }
         
-        .btn-bulk { background-color: #17a2b8 !important; }
-        .btn-bulk:hover { background-color: #138496 !important; }
-
-        .group-filter-btn { background-color: #6c757d !important; font-weight: bold; }
-
-        .grades-table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        .grades-table th, .grades-table td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
-        .grades-table th { background-color: #e9ecef; }
-        .student-name { text-align: left !important; font-weight: 500; min-width: 220px; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn { padding: 6px 14px; border: none; border-radius: 4px; font-weight: bold; color: white; cursor: pointer; font-size: 0.88em; }
         
-        .grade-in { width: 45px; text-align: center; border: 1px solid #ced4da; border-radius: 3px; padding: 4px; }
-        .grade-in:focus { border-color: #80bdff; outline: 0; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+        .btn-blue { background-color: #007bff; }
+        .btn-blue:hover { background-color: #0056b3; }
+        
+        .btn-green { background-color: #28a745; }
+        .btn-green:hover { background-color: #1e7e34; }
+        
+        .btn-teal { background-color: #17a2b8; }
+        .btn-teal:hover { background-color: #117a8b; }
+        
+        .btn-orange { background-color: #fd7e14; }
+        .btn-orange:hover { background-color: #d96200; }
+        
+        .period-selector { display: flex; gap: 4px; margin-bottom: 12px; }
+        .btn-period { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
+        
+        .class-select-wrap { margin-bottom: 10px; }
+        .class-select-wrap select { padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; }
 
-        .stat-col { background-color: #f1f3f5; font-weight: bold; }
-        .group-badge { display: inline-block; padding: 2px 6px; font-size: 0.8em; border-radius: 4px; background: #e2e3e5; color: #383d41; cursor: pointer; }
-        .group-badge:hover { background: #d6d8db; }
+        .table-wrap { overflow-x: auto; background: white; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .grades-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .grades-table th, .grades-table td { border: 1px solid #dcdcdc; padding: 6px 8px; text-align: center; }
+        .grades-table th { background-color: #e9ecef; color: #495057; }
+        
+        .student-cell { text-align: left !important; min-width: 220px; display: flex; justify-content: space-between; align-items: center; }
+        .grade-input { width: 38px; text-align: center; border: 1px solid #ccc; border-radius: 3px; padding: 3px; font-weight: bold; }
 
-        .delete-btn { color: #dc3545; cursor: pointer; font-weight: bold; font-size: 0.9em; margin-left: 8px; border: none; background: none; padding: 0 4px; }
+        .stat-cell { background-color: #f8f9fa; font-weight: bold; }
+        .group-badge { display: inline-block; padding: 2px 5px; font-size: 0.75em; border-radius: 3px; background: #e2e3e5; cursor: pointer; margin-left: 5px; }
+
+        .delete-btn { color: #dc3545; cursor: pointer; font-weight: bold; font-size: 0.85em; margin-left: 8px; border: none; background: none; padding: 0 3px; }
         .delete-btn:hover { color: #a71d2a; }
 
-        /* Модальное окно массового ввода */
-        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fff; margin: 8% auto; padding: 20px; border-radius: 8px; width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .modal-content textarea { width: 95%; height: 200px; font-family: inherit; padding: 8px; margin-top: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+        /* Модальное окно */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: #fff; margin: 8% auto; padding: 20px; border-radius: 8px; width: 440px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .modal-content textarea { width: 95%; height: 180px; font-family: inherit; padding: 8px; margin-top: 10px; border: 1px solid #ccc; border-radius: 4px; }
         .modal-actions { text-align: right; margin-top: 15px; }
-        .modal-actions button { padding: 8px 16px; margin-left: 8px; }
+        .modal-actions button { padding: 6px 12px; margin-left: 6px; }
     </style>
 </head>
 <body>
 
-    <h1>Электронный журнал</h1>
-
-    <div class="controls">
-        <label>Класс:</label>
-        <select id="classSelect" onchange="renderTable()">
-            <!-- Заполняется динамически -->
-        </select>
-
-        <button onclick="addClassPrompt()">+ Добавить класс</button>
-        <button onclick="addStudentPrompt()">+ Добавить ученика</button>
-        <button class="btn-bulk" onclick="openBulkModal()">📋 Добавить списком</button>
-
-        <span style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 15px;"></span>
-        <button class="group-filter-btn" id="filterBtn" onclick="toggleFilter()">👥 Фильтр: Все ученики</button>
+    <div class="class-select-wrap">
+        <label><b>Класс:</b> </label>
+        <select id="classSelect" onchange="renderTable()"></select>
+        <button class="btn btn-blue" onclick="addClassPrompt()">+ Класс</button>
     </div>
 
-    <div id="tableContainer"></div>
+    <div class="breadcrumb" id="breadcrumbText">Классы > Математика</div>
 
-    <!-- Модальное окно для массового вставления учеников -->
+    <div class="toolbar">
+        <button class="btn btn-blue">📅 Даты</button>
+        <button class="btn btn-blue">+ Урок</button>
+        <button class="btn btn-green" onclick="addStudentPrompt()">+ Ученик</button>
+        <button class="btn btn-teal" onclick="openBulkModal()">📋 + Списком</button>
+        <button class="btn btn-orange" id="filterBtn" onclick="toggleFilter()">👥 Фильтр: Все ученики</button>
+    </div>
+
+    <div class="period-selector">
+        <button class="btn-period">Весь год</button>
+        <button class="btn-period">1 Четв.</button>
+        <button class="btn-period">2 Четв.</button>
+        <button class="btn-period">3 Четв.</button>
+        <button class="btn-period">4 Четв.</button>
+    </div>
+
+    <div class="table-wrap">
+        <div id="tableContainer"></div>
+    </div>
+
+    <!-- Модальное окно для добавлении списком -->
     <div id="bulkModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-top:0;">Добавить учеников списком</h3>
-            <p style="font-size: 0.9em; color: #555;">Вставьте список ФИО. Каждый ученик должен быть с новой строки:</p>
+            <p style="font-size:0.85em; color:#555;">Вставьте список ФИО (каждый ученик с новой строки):</p>
             <textarea id="bulkNames" placeholder="Иванов Иван&#10;Петров Петр&#10;Сидорова Анна"></textarea>
             
             <div style="margin-top: 10px;">
-                <label>Подгруппа:</label>
+                <label style="font-size: 0.9em;">Подгруппа: </label>
                 <select id="bulkGroup">
                     <option value="1">1-я подгруппа</option>
                     <option value="2">2-я подгруппа</option>
@@ -78,7 +98,7 @@
 
             <div class="modal-actions">
                 <button onclick="closeBulkModal()">Отмена</button>
-                <button style="background:#28a745; color:white; border:none;" onclick="submitBulkStudents()">Сохранить список</button>
+                <button class="btn btn-green" onclick="submitBulkStudents()">Сохранить список</button>
             </div>
         </div>
     </div>
@@ -95,11 +115,6 @@
             renderTable();
         }
 
-        function extractGradeNum(className) {
-            const match = className.match(/\d+/);
-            return match ? parseInt(match[0], 10) : 999;
-        }
-
         function populateClassSelect() {
             const select = document.getElementById('classSelect');
             const currentVal = select.value;
@@ -107,21 +122,14 @@
 
             if (journalData.classes.length === 0) return;
 
-            const sortedClasses = [...journalData.classes].sort((a, b) => {
-                const numA = extractGradeNum(a.name);
-                const numB = extractGradeNum(b.name);
-                if (numA !== numB) return numA - numB;
-                return a.name.localeCompare(b.name, 'ru');
-            });
-
-            sortedClasses.forEach(cls => {
+            journalData.classes.forEach(cls => {
                 const opt = document.createElement('option');
                 opt.value = cls.id;
                 opt.textContent = cls.name;
                 select.appendChild(opt);
             });
 
-            if (currentVal && sortedClasses.some(c => c.id == currentVal)) {
+            if (currentVal && journalData.classes.some(c => c.id == currentVal)) {
                 select.value = currentVal;
             }
         }
@@ -161,13 +169,17 @@
         }
 
         function renderTable() {
-            const classId = document.getElementById('classSelect').value;
+            const classSelect = document.getElementById('classSelect');
+            const classId = classSelect.value;
             const container = document.getElementById('tableContainer');
             
             if (!classId) {
-                container.innerHTML = '<p>Выберите или создайте класс.</p>';
+                container.innerHTML = '<p style="padding:15px;">Выберите или создайте класс.</p>';
                 return;
             }
+
+            const selectedOptionText = classSelect.options[classSelect.selectedIndex]?.text || '';
+            document.getElementById('breadcrumbText').textContent = `Классы > ${selectedOptionText} > Математика`;
 
             let filteredStudents = journalData.students.filter(s => s.class_id == classId);
 
@@ -178,21 +190,21 @@
             filteredStudents.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
             let html = '<table class="grades-table"><thead><tr>';
-            html += '<th>№</th><th>Ученик</th>';
+            html += '<th style="width: 30px;">№</th><th>ФИО Учащегося</th>';
             
             for (let i = 1; i <= NUM_COLUMNS; i++) {
-                html += `<th>Урок ${i}</th>`;
+                html += `<th>${i}</th>`;
             }
-            html += '<th class="stat-col">Средний</th><th class="stat-col">Н-ки</th><th class="stat-col">Четверть</th></tr></thead><tbody>';
+            html += '<th class="stat-cell">Средн.</th><th class="stat-cell">Н</th><th class="stat-cell">Четв.</th></tr></thead><tbody>';
 
             filteredStudents.forEach((st, idx) => {
                 const stGroup = st.group || '1';
                 html += `<tr>`;
                 html += `<td>${idx + 1}</td>`;
-                html += `<td class="student-name">
+                html += `<td class="student-cell">
                             <span>${st.name}</span> 
                             <div>
-                                <span class="group-badge" onclick="switchGroup(${st.id}, '${stGroup}')" title="Нажмите, чтобы сменить подгруппу">гр. ${stGroup}</span>
+                                <span class="group-badge" onclick="switchGroup(${st.id}, '${stGroup}')">гр.${stGroup}</span>
                                 <button class="delete-btn" onclick="deleteStudent(${st.id}, '${st.name}')" title="Удалить ученика">❌</button>
                             </div>
                          </td>`;
@@ -203,7 +215,7 @@
 
                 for (let c = 1; c <= NUM_COLUMNS; c++) {
                     const val = (journalData.grades[st.id] && journalData.grades[st.id][c]) ? journalData.grades[st.id][c] : '';
-                    html += `<td><input class="grade-in" value="${val}" onchange="saveGrade(${st.id}, ${c}, this.value)" /></td>`;
+                    html += `<td><input class="grade-input" value="${val}" onchange="saveGrade(${st.id}, ${c}, this.value)" /></td>`;
 
                     if (val.toLowerCase() === 'н') n_count++;
                     else {
@@ -215,9 +227,9 @@
                 const avg = count > 0 ? (sum / count).toFixed(2) : '-';
                 const finalGrade = count > 0 ? Math.round(sum / count) : '-';
 
-                html += `<td class="stat-col" id="avg-${st.id}">${avg}</td>`;
-                html += `<td class="stat-col" id="n-${st.id}">${n_count}</td>`;
-                html += `<td class="stat-col" id="q-${st.id}">${finalGrade}</td>`;
+                html += `<td class="stat-cell">${avg}</td>`;
+                html += `<td class="stat-cell">${n_count}</td>`;
+                html += `<td class="stat-cell">${finalGrade}</td>`;
                 html += `</tr>`;
             });
 
@@ -239,7 +251,7 @@
         }
 
         async function addClassPrompt() {
-            const name = prompt('Введите название класса (например, 5 А):');
+            const name = prompt('Введите название класса (например, 6 Б):');
             if (name) {
                 await fetch('/api/add_class', {
                     method: 'POST',
@@ -282,10 +294,7 @@
             const text = document.getElementById('bulkNames').value;
             const group = document.getElementById('bulkGroup').value;
 
-            if (!text.trim()) {
-                alert('Пожалуйста, вставьте хотя бы одно имя/фамилию!');
-                return;
-            }
+            if (!text.trim()) return alert('Вставьте хотя бы одно имя!');
 
             const res = await fetch('/api/add_students_bulk', {
                 method: 'POST',
@@ -295,7 +304,6 @@
 
             const data = await res.json();
             if (data.success) {
-                alert(`Успешно добавлено учеников: ${data.count}`);
                 closeBulkModal();
                 await loadData();
             }
